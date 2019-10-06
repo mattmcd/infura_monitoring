@@ -2,8 +2,12 @@ import requests
 import os
 import json
 from collections import defaultdict
+from functools import partial
+from itertools import chain
 from etherscan.contracts import Contract as EsContract
 from web3 import Web3
+import eth_abi
+from eth_utils import decode_hex
 
 
 def read_config():
@@ -28,14 +32,17 @@ ETHERSCAN_API_KEY = config['etherscan_api_key']
 def get_contract_events(
         contract_address=CONTRACT_ADDRESS,
         from_block=0,
+        topics=None,
         infura_project_id=INFURA_PROJECT_ID
 ):
+    if topics is None:
+        topics = []
     req = requests.post(
         f'https://mainnet.infura.io/v3/{infura_project_id}',
         json={
             "jsonrpc": "2.0",
             "method": "eth_getLogs",
-            "params": [{"address": contract_address.lower(), "fromBlock": hex(from_block)}],
+            "params": [{"address": contract_address.lower(), "fromBlock": hex(from_block), "topics": topics}],
             "id": 1
         }
     )
@@ -61,14 +68,42 @@ def get_contract_abi(
         contract_address=CONTRACT_ADDRESS,
         etherscan_api_key=ETHERSCAN_API_KEY
 ):
-    eth_api = EsContract(address=contract_address, api_key=etherscan_api_key)
-    abi = json.loads(eth_api.get_abi())
+    es_api = EsContract(address=contract_address, api_key=etherscan_api_key)
+    abi = json.loads(es_api.get_abi())
     return abi
 
 
-def get_topics(abi):
+def get_event_interface(abi):
+    """Get details of the event interfaces specified in the contract ABI
+    See https://codeburst.io/deep-dive-into-ethereum-logs-a8d2047c7371
+
+    :param abi: Contract ABI as list of dicts
+    :return: Event interfaces as dict
+    """
     events = [i for i in abi if i['type'] == 'event']
-    topics = {e['name']: Web3.keccak(
-        text=e['name'] + '(' + ','.join([i['type'] for i in e['inputs']]) + ')'
-    ) for e in events}
-    return topics
+    interfaces = {
+        e['name']: {
+            'topic': Web3.toHex(
+                Web3.keccak(text=e['name'] + '(' + ','.join([i['type'] for i in e['inputs']]) + ')')
+            ),
+            'names': [i['name'] for i in e['inputs'] if not i['indexed']],
+            'types': [i['type'] for i in e['inputs'] if not i['indexed']],
+            'indexed_names': [i['name'] for i in e['inputs'] if i['indexed']],
+            'indexed_types': [i['type'] for i in e['inputs'] if i['indexed']],
+        } for e in events
+    }
+
+    # Add decoders
+    def decoder(interface, log):
+        non_indexed = zip(
+            interface['names'],
+            eth_abi.decode_abi(interface['types'], decode_hex(log['data'])))
+        indexed = zip(
+            interface['indexed_names'],
+            [eth_abi.decode_single(t, decode_hex(v)) for t, v in zip(interface['indexed_types'], log['topics'][1:])]
+        )
+        return dict(chain(non_indexed, indexed))
+
+    for e, i in interfaces.items():
+        interfaces[e]['decode'] = partial(decoder, i)
+    return interfaces

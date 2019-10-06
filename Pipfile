@@ -14,6 +14,7 @@ ipython = "*"
 jupyter = "*"
 py-etherscan-api = "*"
 web3 = "*"
+eth-abi = "*"
 
 [requires]
 python_version = "3.7"
