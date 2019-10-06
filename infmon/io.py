@@ -4,6 +4,8 @@ import json
 from collections import defaultdict
 from functools import partial
 from itertools import chain
+import asyncio
+import websockets
 from etherscan.contracts import Contract as EsContract
 from web3 import Web3
 import eth_abi
@@ -62,6 +64,26 @@ def get_current_block(infura_project_id=INFURA_PROJECT_ID):
     )
     resp = req.json()
     return int(resp['result'], 16)
+
+
+async def subscribe(contract_address=CONTRACT_ADDRESS, topics=None, infura_project_id=INFURA_PROJECT_ID):
+    if topics is None:
+        topics = []
+    subscribe_args = {
+            "jsonrpc": "2.0",
+            "method": "eth_subscribe",
+            "params": ["logs", {"address": contract_address.lower(), "topics": topics}],
+            "id": 1
+        }
+    ws_url = f'wss://mainnet.infura.io/ws/{infura_project_id}'
+    async with websockets.connect(ws_url) as ws:
+        await ws.send(json.dumps(subscribe_args))
+        subscribe_id = await ws.recv()
+        print(subscribe_id)
+        # while True:
+        #     message_str = await ws.recv()
+        #     message = json.loads(message_str)
+        #     print(len(message))
 
 
 def get_contract_abi(
