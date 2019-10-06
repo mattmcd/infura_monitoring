@@ -26,7 +26,7 @@ def read_config():
 
 config = read_config()
 
-CONTRACT_ADDRESS = config['contract_address']
+CONTRACT_ADDRESS = config['contract_address'] if 'contract_address' in config else ''
 INFURA_PROJECT_ID = config['infura_project_id']
 ETHERSCAN_API_KEY = config['etherscan_api_key']
 
@@ -80,10 +80,19 @@ async def subscribe(contract_address=CONTRACT_ADDRESS, topics=None, infura_proje
         await ws.send(json.dumps(subscribe_args))
         subscribe_id = await ws.recv()
         print(subscribe_id)
-        # while True:
-        #     message_str = await ws.recv()
-        #     message = json.loads(message_str)
-        #     print(len(message))
+        block_hashes = defaultdict(int)
+        last_block_hash = ''
+        while True:
+            message_str = await ws.recv()
+            message = json.loads(message_str)['params']['result']
+            block_hashes[message['blockHash']] += 1
+            if message['removed']:
+                print('REMOVED')
+                print(message)
+            else:
+                if message['blockHash'] != last_block_hash:
+                    print(last_block_hash + ': ' + str(block_hashes[last_block_hash]))
+                    last_block_hash = message['blockHash']
 
 
 def get_contract_abi(
