@@ -85,13 +85,15 @@ async def subscribe(contract_address=CONTRACT_ADDRESS, topics=None, infura_proje
         while True:
             message_str = await ws.recv()
             message = json.loads(message_str)['params']['result']
+            # Simple handler to count transactions per block and show any removed transactions
             block_hashes[message['blockHash']] += 1
             if message['removed']:
                 print('REMOVED')
                 print(message)
             else:
                 if message['blockHash'] != last_block_hash:
-                    print(last_block_hash + ': ' + str(block_hashes[last_block_hash]))
+                    if last_block_hash != '':
+                        print(last_block_hash + ': ' + str(block_hashes[last_block_hash]))
                     last_block_hash = message['blockHash']
 
 

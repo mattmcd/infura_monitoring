@@ -18,9 +18,11 @@ Can also enter a default contract address.
 
 
 
-## Example usage
+## Example usage - RPC interface
 Example using [Tether stablecoin](https://etherscan.io/token/0xdac17f958d2ee523a2206206994597c13d831ec7).  We get
-the ABI, find the topic for Transfer event and get these.
+the ABI, find the topic for Transfer event and get these events.  This could be used as the ETL step for a 
+data science application e.g. get all Transfers over a given time period and do some [graph analysis](https://networkx.github.io/).
+
 
     from infmon.io import (get_contract_abi, get_event_interface, 
         get_current_block, get_contract_events, subscribe)
@@ -36,6 +38,51 @@ the ABI, find the topic for Transfer event and get these.
     # Display 
     [token_interface['Transfer']['decode'](t) for t in transfers]
     
-    # Subscription interface - WIP not quite working yet
-    await subscribe(token_address, 
-                    topics=[token_interface['Transfer']['topic']])
+    
+## Example usage - websocket subscription
+To drive a user interface in realtime we woudl like to get events streamed from a websocket.
+These events can then be stored in a backend cache database to service frontend clients with the state
+of the system.  
+
+A complication arises due to [chain reorganization events](https://blog.ethereum.org/2015/08/08/chain-reorganisation-depth-expectations/)
+which will cause already seen transactions to be reverted.  Fortunately the Infura 
+[eth_subscribe](https://infura.io/docs/ethereum/wss/eth_subscribe) websockets endpoint resends previously sent logs 
+on the old chain with the `removed` attribute set to true so these can be handled.  
+
+The example below is a work in progress with a simple message handler that prints counts of Transfer events in 
+each block if there are not removed transactions, and prints any removed transactions otherwise.
+
+    # Subscription interface 
+    await subscribe(token_address, topics=[token_interface['Transfer']['topic']])
+    
+    # Results below:
+    # Initial response with subscription ID
+    {"jsonrpc":"2.0","id":1,"result":"0x1feed340b2f854185bd4cfcee65748d"}
+    # Normal blocks with count of Transfer events in block 
+    0x1754f43ba29f72b487889ed1dc58df214f13bcdb014a06b04aaad8e0344e27af: 9
+    0x0da94fb67c84ee22d9bb6e6ba806e533e90fa7e8e5704bf6d74aaeb210c791d7: 16
+    # Block reorganization produces transactions with removed set to True
+    REMOVED
+    {'removed': True, 'logIndex': '0x7', 'transactionIndex': '0x32', 
+     'transactionHash': '0xc0b35d02011026f6dee695c40b69a972949bddb40ffe0d21391f2c23572b2a2f', 
+      'blockHash': '0xc4dc057c1fa6742128befb189d82ef727b0555fd3066f974e23864c3c4f09416', 
+      'blockNumber': '0x84a7fb', 'address': '0xdAC17F958D2ee523a2206206994597C13D831ec7', 
+      'data': '0x0000000000000000000000000000000000000000000000000000000103d10fc0', 
+      'topics': ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef', 
+      '0x0000000000000000000000000a98fb70939162725ae66e626fe4b52cff62c2e5', 
+      '0x000000000000000000000000adba6097a5c63c586aa7c9ee5665ffa746f7f255']}
+    REMOVED
+    {'removed': True, 'logIndex': '0x8', 'transactionIndex': '0x33', 
+     'transactionHash': '0x925555803b5e083237deb13bb1be2a0ff12a7cc3e680553faa7fe76b83627f73', 
+     'blockHash': '0xc4dc057c1fa6742128befb189d82ef727b0555fd3066f974e23864c3c4f09416', 
+     'blockNumber': '0x84a7fb', 'address': '0xdAC17F958D2ee523a2206206994597C13D831ec7', 
+     'data': '0x000000000000000000000000000000000000000000000000000000002878b7c0', 
+     'topics': ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef', 
+     '0x0000000000000000000000000a98fb70939162725ae66e626fe4b52cff62c2e5', 
+     '0x000000000000000000000000cca1bbbc2c907afd731c2158e80172531e74cd72']}
+    ... # More removed transactions
+    # Next block    
+    0xc4dc057c1fa6742128befb189d82ef727b0555fd3066f974e23864c3c4f09416: 74
+    0xf65a34ff8c131c3508f52a432b45e7a5d2c34bf2a4d8996c4e18d55d045a47dc: 36
+    0x16a18d1351190a69f7df34b7b5336deb3e257b9fb7b4b347b2e7962911aa6215: 15
+    0xb88fba7fba0b343335e2c1f5816e741a07631b86909ac106db91e45d4bbbfc59: 15
