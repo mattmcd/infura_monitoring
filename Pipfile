@@ -15,6 +15,7 @@ jupyter = "*"
 py-etherscan-api = "*"
 web3 = "*"
 eth-abi = "*"
+python-dotenv = "*"
 
 [requires]
 python_version = "3.7"
