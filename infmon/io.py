@@ -66,6 +66,22 @@ def get_current_block(infura_project_id=INFURA_PROJECT_ID):
     return int(resp['result'], 16)
 
 
+def get_block_by_number(block_number=None, show_details=False, infura_project_id=INFURA_PROJECT_ID):
+    req = requests.post(
+        f'https://mainnet.infura.io/v3/{infura_project_id}',
+        json={
+            "jsonrpc": "2.0",
+            "method": "eth_getBlockByNumber",
+            "params": [hex(block_number), show_details],
+            "id": 2
+        }
+    )
+    resp = req.json()
+    res = resp['result']
+    res['timestamp'] = int(res['timestamp'], 16)  # Convert to Unix timestamp
+    return res
+
+
 async def subscribe(contract_address=CONTRACT_ADDRESS, topics=None, infura_project_id=INFURA_PROJECT_ID):
     if topics is None:
         topics = []
