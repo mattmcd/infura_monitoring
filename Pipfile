@@ -16,6 +16,7 @@ py-etherscan-api = "*"
 web3 = "*"
 eth-abi = "*"
 python-dotenv = "*"
+openpyxl = "*"
 
 [requires]
 python_version = "3.7"
