@@ -86,3 +86,47 @@ each block if there are not removed transactions, and prints any removed transac
     0xf65a34ff8c131c3508f52a432b45e7a5d2c34bf2a4d8996c4e18d55d045a47dc: 36
     0x16a18d1351190a69f7df34b7b5336deb3e257b9fb7b4b347b2e7962911aa6215: 15
     0xb88fba7fba0b343335e2c1f5816e741a07631b86909ac106db91e45d4bbbfc59: 15
+    
+# Interesting contracts
+
+## Tokens
+
+Use [EthPlorer API](https://github.com/EverexIO/Ethplorer/wiki/Ethplorer-API) to retrieve list of top traded tokens as json
+
+     curl https://api.ethplorer.io/getTopTokens?apiKey=freekey -o cache/ethplorer_top20200523.json
+     
+## dYdX DEX
+[Contract Addresses](https://docs.dydx.exchange/#/contracts)
+
+    from infmon.eth import read_credentials, connect, get_contract
+    read_credentials('/home/mattmcd/.mattmcd')  # Populates environment variables
+    w3 = connect()   # Connects to mainnet via Infura and sets defaultAccount 
+    
+    # Populate cache if needed - commented out 
+    # c = get_contract('dYdX_SoloMargin', '0x1E0447b19BB6EcFdAe1e4AE1694b0C3659614e4e')
+    
+    # Connect to contract
+    solo = w3.eth.contract(**get_contract('dYdX_SoloMargin'))
+    
+    solo.all_functions()
+    Out[7]: 
+    [<Function ownerSetSpreadPremium(uint256,tuple)>,
+     <Function getIsGlobalOperator(address)>,
+     <Function getMarketTokenAddress(uint256)>,
+     ...
+     <Function getAdjustedAccountValues(tuple)>,
+     <Function getMarketMarginPremium(uint256)>,
+     <Function getMarketInterestRate(uint256)>]
+    
+    me = w3.eth.defaultAccount
+    
+    solo.functions.getMarket(0).call({'from': me.address})
+    Out[10]: 
+    ('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+     (17223105496066458626271, 101489418110876542971309),
+     (1010406097301649461, 1001404702877850791, 1590241097),
+     '0xf61AE328463CD997C7b58e7045CdC613e1cFdb69',
+     '0x7538651D874b7578CF52152c9ABD8f6617a38403',
+     (0,),
+     (0,),
+     False)
