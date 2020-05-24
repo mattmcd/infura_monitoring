@@ -1,6 +1,6 @@
 import os
 import json
-import web3
+from web3.middleware import construct_sign_and_send_raw_middleware
 from pathlib import Path
 from infmon.io import get_contract_abi
 
@@ -22,12 +22,14 @@ def connect():
 
     assert w3.isConnected()
 
-    w3.eth.defaultAccount = w3.eth.account.from_key(credentials['mainnet']['key'])
+    acct = w3.eth.account.from_key(credentials['mainnet']['key'])
+    w3.middleware_onion.add(construct_sign_and_send_raw_middleware(acct))
+    w3.eth.defaultAccount = acct.address
 
     return w3
 
 
-def get_contract(name, address=None, abi=None):
+def get_contract(name, w3=None, address=None, abi=None):
     credentials = json.loads(os.environ.get('CREDENTIALS'))
     cache_dir = Path(__file__).parent / "../cache"
     if not cache_dir.is_dir():
@@ -48,4 +50,12 @@ def get_contract(name, address=None, abi=None):
         }
         with open(cache_file, 'w') as f:
             json.dump(contract_details, f)
-    return contract_details
+    if w3 is None:
+        # Return contract details as dict
+        # NB: address may be non-checksum version which can cause problems downstream
+        return contract_details
+    else:
+        contract_details['address'] = w3.toChecksumAddress(contract_details['address'])
+        # Remove ctor and default
+        contract_details['abi'] = [f for f in contract_details['abi'] if 'name' in f]
+        return w3.eth.contract(**contract_details)
